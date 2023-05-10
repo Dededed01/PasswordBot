@@ -79,8 +79,12 @@ async def check_name(message: types.Message, state: FSMContext):
     passw = await state.get_data()
     passw['password'] = message.text
     await state.update_data(passw)
-    await message.answer(f"Отлично, вот твоя запись:\n{passw['domain']}\n{passw['login']}\n{passw['password']}\n\nНапиши Да, если все верно, или Нет, если хочешь изменить запись")
+    newmsg = await message.answer(f"Отлично, вот твоя запись:\n\n{passw['domain']}\n{passw['login']}\n{passw['password']}\n\nНапиши Да, если все верно, или Нет, если хочешь изменить запись")
     await state.set_state(Dialog.waiting_for_confirmation)
+    await asyncio.sleep(60)
+    await message.delete()
+    await newmsg.edit_text("_Я спрятал пароль в целях безопасности_\nТы можешь найти его, написав /get", parse_mode="markdown")
+
 
 
 @dp.message(Dialog.waiting_for_confirmation)
@@ -92,10 +96,12 @@ async def is_alright(message: types.Message, state: FSMContext):
         pickle.dump(passwords, f)
         f.close()
         await state.clear()
-        await message.answer("Отлично! Теперь ты можешь написать /get, чтобы посмотреть свои пароли")
-    else:
+        await message.answer("Отлично! Теперь ты можешь написать /get, чтобы посмотреть свои пароли, или /delete, чтобы удалить ненужные")
+    elif message.text.lower == "нет":
         await message.answer("Хорошо, давай попробуем еще раз. Как назовем запись?")
         await state.set_state(Dialog.choose_domain_name)
+    else:
+        await message.answer("Пожалуйста, ответь Да или Нет. Если передумал, напиши /cancel, чтобы вернуться в начало")
 
 
 @dp.message(Command("get"))
@@ -104,7 +110,7 @@ async def reading(message: types, state: FSMContext):
     for i in passwords:
         if i[0] == message.from_user.id:
             outp.append(i[1])
-    await message.answer("Вот список твоих паролей:\n"+"\n".join(outp)+"\nНапиши, какую запись ты хочешь просмотреть. \nПиши в точности так, как указано в списке")
+    await message.answer("Вот список твоих паролей:\n"+"\n".join(outp)+"\n\nНапиши, какую запись ты хочешь просмотреть. \nПиши в точности так, как указано в списке")
     await state.set_state(Dialog.waiting_for_choice)
 
 
@@ -113,11 +119,16 @@ async def output(message: types.Message, state: FSMContext):
     flag = 0
     for i in passwords:
         if i[1] == message.text:
-            await message.answer(f"Вот твоя запись:\nЛогин: <code>{i[2]}</code>\nПароль: <code>{i[3]}</code>", parse_mode="HTML")
+            newmsg = await message.answer(f"Вот твоя запись:\nЛогин: <code>{i[2]}</code>\nПароль: <code>{i[3]}</code>", parse_mode="HTML")
             await state.clear()
             flag = 1
+            await asyncio.sleep(60)
+            await message.delete()
+            await newmsg.edit_text("_Я спрятал пароль в целях безопасности_\nТы можешь найти его, написав /get",
+                                   parse_mode="markdown")
     if flag != 1:
         await message.answer("Кажется, такой записи нет. Попробуй еще раз или напиши /cancel, чтобы вернуться в начало")
+
 
 @dp.message(Command("delete"))
 async def output(message: types.Message, state: FSMContext):
@@ -125,7 +136,7 @@ async def output(message: types.Message, state: FSMContext):
     for i in passwords:
         if i[0] == message.from_user.id:
             outp.append(i[1])
-    await message.answer("Вот список твоих паролей:\n" + "\n".join(outp) + "\nНапиши, какую запись ты хочешь удалить. \nПиши в точности так, как указано в списке")
+    await message.answer("Вот список твоих паролей:\n\n" + "\n".join(outp) + "\n\nНапиши, какую запись ты хочешь удалить. \nПиши в точности так, как указано в списке")
     await state.set_state(Dialog.waiting_for_delete_choice)
 
 
@@ -155,9 +166,11 @@ async def is_alright(message: types.Message, state: FSMContext):
         f.close()
         await state.clear()
         await message.answer("Отлично! Теперь ты можешь написать /get, чтобы посмотреть свои пароли")
-    else:
+    elif message.text.lower == "нет":
         await message.answer("Хорошо, давай попробуем еще раз. Как назовем запись?")
         await state.set_state(Dialog.choose_domain_name)
+    else:
+        await message.answer("Пожалуйста, ответь Да или Нет. Если передумал, напиши /cancel, чтобы вернуться в начало")
 
 
 # Запуск процесса поллинга новых апдейтов
